@@ -15,8 +15,9 @@ are not yet implemented.
 
 To use `decimal` as a dependency of another Lean project, prepare libmpdec on
 your machine **before running `lake update` or `lake build` in that project**.
-Then pass its installation location to the `decimal` dependency in your
-`lakefile.lean`, as shown below. Lake builds `decimal` along with your project.
+Then specify its installation location through environment variables or the
+`decimal` dependency's `with` options, as shown below. Lake builds `decimal` along
+with your project.
 
 - The Lean version specified in `lean-toolchain`.
 - **64-bit libmpdec >= 2.5.0**, including headers and a linkable library.
@@ -140,31 +141,71 @@ Restart the editor after changing its inherited environment. The library's own
 dependency check runs through Lean IO; MSYS2 is used here to compile the upstream
 C dependency.
 
-### Other installation layouts
+### Environment variables
 
-If headers and libraries are on the compiler's default search paths, you can omit
-the `with` configuration from `require decimal`. Otherwise, use these keys in the
-dependency's `NameMap`:
+You can keep machine-specific paths out of your project's `lakefile.lean` by
+using environment variables. The dependency declaration then needs no `with`:
 
-| Option | Meaning |
-| --- | --- |
-| `mpdecPrefix` | Installation prefix containing `include/` and `lib/` |
-| `mpdecIncludeDir` | Override the header directory |
-| `mpdecLibDir` | Override the library directory |
-| `mpdecLibName` | Linker library name, default `mpdec` |
-| `mpdecLinkFile` | Absolute path to a library or Windows import library |
-| `mpdecCC` | Host C compiler executable |
+```lean
+require decimal from git "https://github.com/Qiu233/decimal"
+```
+
+On Linux or macOS, after installing libmpdec as above:
+
+```bash
+export MPDEC_PREFIX="$HOME/.local/mpdecimal"
+export MPDEC_CC=clang  # Optional; Unix defaults to cc.
+lake -R build
+```
+
+On Windows, in PowerShell:
+
+```powershell
+$env:PATH = "C:\msys64\clang64\bin;$env:PATH"
+$env:MPDEC_PREFIX = "C:/mpdecimal"
+$env:MPDEC_CC = "C:/msys64/clang64/bin/clang.exe"
+lake -R build
+```
+
+Set these variables before running `lake update` or `lake build`. They are also
+read when `decimal` is a transitive dependency. Start or restart your editor from
+an environment containing the same settings.
+
+Lake caches the resolved configuration. **After changing or unsetting any of
+these variables, run `lake -R build`** in your project to reload it. An ordinary
+`lake build` reuses the cached settings.
+
+### Other installation layouts and configuration precedence
+
+If headers and libraries are on the compiler's default search paths, no location
+settings are needed. Otherwise, use these keys in the dependency's `NameMap` or
+the corresponding environment variables:
+
+| Option | Environment variable | Meaning |
+| --- | --- | --- |
+| `mpdecPrefix` | `MPDEC_PREFIX` | Installation prefix containing `include/` and `lib/` |
+| `mpdecIncludeDir` | `MPDEC_INCLUDE_DIR` | Override the header directory |
+| `mpdecLibDir` | `MPDEC_LIB_DIR` | Override the library directory |
+| `mpdecLibName` | `MPDEC_LIB_NAME` | Linker library name, default `mpdec` |
+| `mpdecLinkFile` | `MPDEC_LINK_FILE` | Absolute path to a library or Windows import library |
+| `mpdecCC` | `MPDEC_CC` | Host C compiler executable |
+
+For each option, an explicit Lake setting takes precedence over its environment
+variable, followed by the default. Empty environment values are ignored. Header
+and library directories default to `include/` and `lib/` under the resolved
+prefix; explicit directory settings override those defaults.
 
 The consuming project's `-K` options do not automatically apply to its
-dependencies: pass these settings through `require ... with`. Use absolute paths;
-spaces in paths are supported. Native link inputs propagate to your project's
-executables automatically.
+dependencies: use `require ... with` or environment variables for dependencies.
+When building `decimal` itself, its `-K` options also override the corresponding
+environment variables. Use absolute paths; spaces in paths are supported. Native
+link inputs propagate to your project's executables automatically.
 
 The instructions above and release builds use **static libmpdec**. On Unix,
 `-fPIC` is needed for Lean's precompiled modules and `#eval`. If both static and
-shared libraries are installed, set `mpdecLinkFile` to the absolute path of
-`libmpdec.a` to ensure every link step selects the static library. Static builds
-do not need a libmpdec runtime search path.
+shared libraries are installed, set `mpdecLinkFile` or `MPDEC_LINK_FILE` to the
+absolute path of `libmpdec.a` to ensure every link step selects the static library.
+Static builds do not need a libmpdec runtime search path.
 
 Source builds can also link a separately installed shared libmpdec. In that case,
 make its shared library available to the runtime loader: `LD_LIBRARY_PATH` on
@@ -190,8 +231,9 @@ require decimal from git "https://github.com/Qiu233/decimal" with
 ```
 
 Use the `with` settings for your platform from the previous section and keep
-your own project's targets below the dependency declaration. Use the Lean version
-specified in this repository's `lean-toolchain`.
+your own project's targets below the dependency declaration. If using environment
+variables, omit `with` and its `NameMap` instead. Use the Lean version specified in
+this repository's `lean-toolchain`.
 
 Run these commands from **your consuming project's root directory**:
 

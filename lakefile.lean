@@ -4,20 +4,32 @@ public import Lake
 public meta import Lake
 open Lake DSL
 
-private def mpdecPrefix : String := (get_config? mpdecPrefix).getD ""
+-- Explicit Lake options override environment variables; empty environment values
+-- use the defaults. Lake caches run_io results, so changes require lake -R.
+private def mpdecSetting (config : Option String) (envName fallback : String) : IO String := do
+  if let some value := config then return value
+  return ((← IO.getEnv envName).filter (! ·.isEmpty)).getD fallback
 
-private def mpdecIncludeDir : String := (get_config? mpdecIncludeDir).getD
-  (if mpdecPrefix.isEmpty then "" else (System.FilePath.mk mpdecPrefix / "include").toString)
+private def mpdecPrefix : String := run_io
+  mpdecSetting (get_config? mpdecPrefix) "MPDEC_PREFIX" ""
 
-private def mpdecLibDir : String := (get_config? mpdecLibDir).getD
-  (if mpdecPrefix.isEmpty then "" else (System.FilePath.mk mpdecPrefix / "lib").toString)
+private def mpdecIncludeDir : String := run_io
+  mpdecSetting (get_config? mpdecIncludeDir) "MPDEC_INCLUDE_DIR"
+    (if mpdecPrefix.isEmpty then "" else (System.FilePath.mk mpdecPrefix / "include").toString)
 
-private def mpdecLibName : String := (get_config? mpdecLibName).getD "mpdec"
-private def mpdecLinkFile : String := (get_config? mpdecLinkFile).getD ""
+private def mpdecLibDir : String := run_io
+  mpdecSetting (get_config? mpdecLibDir) "MPDEC_LIB_DIR"
+    (if mpdecPrefix.isEmpty then "" else (System.FilePath.mk mpdecPrefix / "lib").toString)
+
+private def mpdecLibName : String := run_io
+  mpdecSetting (get_config? mpdecLibName) "MPDEC_LIB_NAME" "mpdec"
+private def mpdecLinkFile : String := run_io
+  mpdecSetting (get_config? mpdecLinkFile) "MPDEC_LINK_FILE" ""
 
 -- External headers need the host C SDK, which Lean's minimal sysroot need not contain.
-private def mpdecCC : String := (get_config? mpdecCC).getD
-  (if System.Platform.isWindows then "clang" else "cc")
+private def mpdecCC : String := run_io
+  mpdecSetting (get_config? mpdecCC) "MPDEC_CC"
+    (if System.Platform.isWindows then "clang" else "cc")
 
 private def mpdecIncludeArgs : Array String :=
   if mpdecIncludeDir.isEmpty then #[] else #["-I", mpdecIncludeDir]
@@ -33,7 +45,7 @@ private def runMpdecCC (args : Array String) : IO IO.Process.Output := do
   try
     IO.Process.output { cmd := mpdecCC, args }
   catch e =>
-    throw <| IO.userError s!"decimal: cannot start C compiler '{mpdecCC}'. Install a C SDK or set -KmpdecCC=/path/to/compiler.\n{e}"
+    throw <| IO.userError s!"decimal: cannot start C compiler '{mpdecCC}'. Install a C SDK or set MPDEC_CC (or -KmpdecCC) to the compiler path, then run lake -R build.\n{e}"
 
 /-- Resolve the installed library to a real file so Lake can propagate it to
     downstream executables and track changes. No files are installed or copied. -/
@@ -55,7 +67,7 @@ private def findMpdecLibrary : IO System.FilePath := do
     if r.exitCode == 0 && r.stdout.trimAscii.copy != name then
       let path := System.FilePath.mk r.stdout.trimAscii.copy
       if ← path.pathExists then return path
-  throw <| IO.userError "decimal: cannot locate the installed libmpdec file. Set -KmpdecLinkFile=/absolute/path/to/library (or mpdecLibDir)."
+  throw <| IO.userError "decimal: cannot locate the installed libmpdec file. Set MPDEC_LINK_FILE (or mpdecLinkFile) to the absolute library path, then run lake -R build."
 
 private def checkMpdec : IO Unit := IO.FS.withTempDir fun dir => do
   let src := dir / "probe.c"
@@ -80,8 +92,9 @@ private def checkMpdec : IO Unit := IO.FS.withTempDir fun dir => do
       "decimal: usable libmpdec headers and library were not found.\n" ++
       "Required: libmpdec >= 2.5.0, configured for 64-bit arithmetic.\n" ++
       "Install it from https://www.bytereef.org/mpdecimal/download.html\n" ++
-      "Custom prefix: lake -R -KmpdecPrefix=/absolute/prefix build\n" ++
-      "Or configure mpdecIncludeDir, mpdecLibDir, mpdecLibName and mpdecCC separately.\n" ++
+      "Set MPDEC_PREFIX to the installation prefix, then run lake -R build.\n" ++
+      "Or set mpdecPrefix in require ... with (or -KmpdecPrefix for decimal itself).\n" ++
+      "Headers, libraries and compiler can also be configured separately; see README.md.\n" ++
       "This build never downloads, builds or installs libmpdec.\n" ++ r.stderr
 
 -- Fail while elaborating the package configuration, before compiling Lean modules.
