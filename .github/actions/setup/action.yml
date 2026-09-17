@@ -1,0 +1,48 @@
+name: Set up Decimal CI
+description: Install Lean and explicitly provision a static libmpdec for this CI runner
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.12"
+    - name: Set up Windows C toolchain
+      if: runner.os == 'Windows'
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: CLANG64
+        install: make mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-llvm-tools
+        update: true
+    - name: Fetch and verify CI dependency source
+      shell: python
+      run: |
+        import runpy
+        runpy.run_path('.github/scripts/fetch_mpdecimal.py', run_name='__main__')
+    - name: Build libmpdec on Unix
+      if: runner.os != 'Windows'
+      shell: bash
+      run: |
+        cd "$MPDEC_SOURCE"
+        ./configure --prefix="$MPDEC_PREFIX" --disable-cxx --enable-static --disable-shared CC=clang CFLAGS="-O3 -fPIC"
+        make -j2
+        make install
+    - name: Build libmpdec on Windows
+      if: runner.os == 'Windows'
+      shell: msys2 {0}
+      run: |
+        set -euo pipefail
+        cd "$(cygpath -u "$MPDEC_SOURCE")"
+        ./configure --prefix="$(cygpath -u "$MPDEC_PREFIX")" --disable-cxx --enable-static --disable-shared CC=clang CFLAGS="-O3"
+        make -j2
+        make install
+        printf 'MPDEC_CC=%s\n' "$(cygpath -m /clang64/bin/clang.exe)" >> "$(cygpath -u "$GITHUB_ENV")"
+        cygpath -m /clang64/bin >> "$(cygpath -u "$GITHUB_PATH")"
+    - name: Install Lean
+      uses: leanprover/lean-action@v1
+      with:
+        auto-config: false
+        build: false
+        test: false
+        lint: false
+        use-github-cache: false
+        use-mathlib-cache: false

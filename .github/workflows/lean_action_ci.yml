@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      release-archives:
+        description: Pack the tested build outputs for a release
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: "1"
+
+jobs:
+  build:
+    name: Test (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x86_64
+            os: ubuntu-24.04
+          - platform: macos-x86_64
+            os: macos-15-intel
+          - platform: macos-arm64
+            os: macos-15
+          - platform: windows-x86_64
+            os: windows-2022
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup
+      - name: Check project language
+        run: python .github/scripts/check_sources.py
+      - name: Test release gates offline
+        run: python .github/scripts/test_release.py
+      - name: Build and test
+        run: python .github/scripts/test.py
+      - name: Pack and verify Lake archive
+        if: inputs.release-archives
+        run: python .github/scripts/release.py pack
+      - name: Stage release archive
+        if: inputs.release-archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: .lake/decimal-*.tar.gz*
+          include-hidden-files: true
+          if-no-files-found: error
