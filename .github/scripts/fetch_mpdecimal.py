@@ -10,7 +10,7 @@ import urllib.request
 
 VERSION = "4.0.1"
 SHA256 = "96d33abb4bb0070c7be0fed4246cd38416188325f820468214471938545b1ac8"
-URL = f"https://www.bytereef.org/software/mpdecimal/mpdecimal-{VERSION}.tar.gz"
+URL = f"https://www.bytereef.org/software/mpdecimal/releases/mpdecimal-{VERSION}.tar.gz"
 
 
 def main():
@@ -19,6 +19,7 @@ def main():
     work = Path(os.environ["RUNNER_TEMP"]) / "decimal-dependency"
     work.mkdir()
     archive = work / "mpdecimal.tar.gz"
+    print(f"Downloading mpdecimal {VERSION} from {URL}", flush=True)
     for attempt in range(3):
         try:
             with urllib.request.urlopen(URL, timeout=60) as response:

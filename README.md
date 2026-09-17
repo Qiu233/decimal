@@ -62,7 +62,7 @@ make install
 Then add this dependency declaration to **your project's** `lakefile.lean`:
 
 ```lean
-require decimal from git "<repository-url>" @ "<pinned-tag-or-commit>" with
+require decimal from git "https://github.com/Qiu233/decimal" with
   NameMap.empty.insert `mpdecPrefix "/home/alice/.local/mpdecimal"
 ```
 
@@ -87,7 +87,7 @@ make install
 Then add this dependency declaration to **your project's** `lakefile.lean`:
 
 ```lean
-require decimal from git "<repository-url>" @ "<pinned-tag-or-commit>" with
+require decimal from git "https://github.com/Qiu233/decimal" with
   NameMap.empty
     |>.insert `mpdecPrefix "/Users/alice/.local/mpdecimal"
     |>.insert `mpdecCC "clang"
@@ -129,7 +129,7 @@ $env:PATH = "C:\msys64\clang64\bin;$env:PATH"
 In your project's `lakefile.lean`, configure the dependency:
 
 ```lean
-require decimal from git "<repository-url>" @ "<pinned-tag-or-commit>" with
+require decimal from git "https://github.com/Qiu233/decimal" with
   NameMap.empty
     |>.insert `mpdecPrefix "C:/mpdecimal"
     |>.insert `mpdecCC "C:/msys64/clang64/bin/clang.exe"
@@ -185,13 +185,13 @@ public section
 
 package myProject
 
-require decimal from git "<repository-url>" @ "<pinned-tag-or-commit>" with
+require decimal from git "https://github.com/Qiu233/decimal" with
   NameMap.empty.insert `mpdecPrefix "/absolute/path/to/mpdecimal"
 ```
 
 Use the `with` settings for your platform from the previous section and keep
-your own project's targets below the dependency declaration. Pin a release tag
-or commit compatible with the Lean version in this repository's `lean-toolchain`.
+your own project's targets below the dependency declaration. Use the Lean version
+specified in this repository's `lean-toolchain`.
 
 Run these commands from **your consuming project's root directory**:
 
