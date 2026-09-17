@@ -26,7 +26,8 @@ private def mpdecLinkArgs : Array String :=
   (if mpdecLibDir.isEmpty then #[] else #["-L", mpdecLibDir] ++
     (if System.Platform.isWindows then #[] else #["-Wl,-rpath," ++ mpdecLibDir])) ++
   (if mpdecLinkFile.isEmpty then #["-l" ++ mpdecLibName] else #[mpdecLinkFile]) ++
-  (if System.Platform.isWindows then #[] else #["-lm"])
+  -- macOS provides math symbols through libSystem; Lean's sysroot has no separate libm.
+  (if System.Platform.isWindows || System.Platform.isOSX then #[] else #["-lm"])
 
 private def runMpdecCC (args : Array String) : IO IO.Process.Output := do
   try

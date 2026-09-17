@@ -46,3 +46,23 @@ runs:
         lint: false
         use-github-cache: false
         use-mathlib-cache: false
+    - name: Verify native Lean toolchain access
+      shell: python
+      run: |
+        import os
+        from pathlib import Path
+        import shutil
+        import subprocess
+
+        if os.name == 'nt':
+            # lean-action exports a Git Bash path; native Python needs a Windows path.
+            elan_bin = Path(os.environ.get('ELAN_HOME') or Path.home() / '.elan') / 'bin'
+            if not (elan_bin / 'lake.exe').is_file():
+                raise SystemExit(f'Lake executable is missing from {elan_bin}')
+            with open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8') as output:
+                output.write(str(elan_bin) + '\n')
+            os.environ['PATH'] = str(elan_bin) + os.pathsep + os.environ.get('PATH', '')
+
+        for tool in ['lean', 'lake']:
+            print(f'{tool}: {shutil.which(tool)}', flush=True)
+            subprocess.run([tool, '--version'], check=True)
