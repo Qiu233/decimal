@@ -341,12 +341,17 @@ The [Release workflow](.github/workflows/release.yml) follows the structure of
 [Lean-zh/protobuf's release workflow](https://github.com/Lean-zh/protobuf/blob/master/.github/workflows/release.yml):
 
 1. Set the package version in `lakefile.lean` and commit to the default branch.
-2. Manually run **Release** on that branch with a matching tag, such as `v0.1.0`.
+2. Open [Release in Actions](https://github.com/Qiu233/decimal/actions/workflows/release.yml),
+   select **Run workflow** on that branch, and enter a matching tag, such as `v0.1.0`.
 3. The workflow validates the version and any existing tag, runs the complete
    four-platform CI matrix, and packs a Lake build archive on each platform.
 4. Once all platforms pass, it creates the tag and GitHub release and uploads four
    archives and their SHA-256 checksums. Retrying the same commit/tag updates the
    assets; an existing tag for another commit is rejected.
+
+Pushing changes to the release workflow or its helper scripts runs only the
+offline release checks. This also registers the workflow in Actions for new
+repositories. Building and publishing release archives requires a manual run.
 
 Release archives contain this package's build outputs with libmpdec linked
 statically, plus its upstream copyright and license notice. Before packing, the

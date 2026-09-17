@@ -1,6 +1,11 @@
 name: Release
 
 on:
+  push:
+    paths:
+      - .github/workflows/release.yml
+      - .github/scripts/release.py
+      - .github/scripts/test_release.py
   workflow_dispatch:
     inputs:
       tag:
@@ -12,15 +17,29 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ inputs.tag }}
+  group: release-${{ inputs.tag || github.ref }}
   cancel-in-progress: false
 
 env:
   PYTHONUTF8: "1"
 
 jobs:
+  check:
+    name: Check release scripts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Test release gates offline
+        run: python .github/scripts/test_release.py
+
   validate:
     name: Validate release
+    needs: check
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
@@ -44,6 +63,7 @@ jobs:
   publish:
     name: Publish release
     needs: build-archives
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
