@@ -1,17 +1,10 @@
 # decimal
 
-An arbitrary-precision decimal core for Lean 4, following Python's `decimal`
-semantics for values, contexts, rounding, and signals. Logical definitions live in
-Lean; compiled operations call a separately installed libmpdec through `@[extern]`.
+An arbitrary-precision decimal library implemented in Lean 4, with formalized
+semantics and kernel-checked proofs. For performance, compiled operations call
+libmpdec through FFI, using the same library as Python's `decimal`.
 
-Supported operations include exact construction from strings, integers, or
-coefficient/exponent pairs; formatting; addition, subtraction, multiplication,
-division, quantize, and context rounding. Values preserve signed zero, Infinity,
-and NaN/sNaN payloads. All eight rounding modes, eight signal categories, and traps
-are supported. Floating-point conversion, Unicode digits, sqrt, exp, ln, and fma
-are not yet implemented.
-
-## Requirements
+## Usage
 
 To use `decimal` as a dependency of another Lean project, prepare libmpdec on
 your machine **before running `lake update` or `lake build` in that project**.
@@ -26,27 +19,17 @@ with your project.
 - A C11 compiler with GCC/Clang-compatible command-line options and system C
   headers. The default is `cc` on Unix and `clang` on Windows.
 
-The Lake build **never downloads, builds, or installs libmpdec**. Its
-dependency check uses Lean `IO.FS` and `IO.Process`, without project shell scripts
-or pkg-config. It compiles and links a temporary C probe to check the headers,
-version, 64-bit configuration, and required symbols. Missing dependencies stop
-the build before Lean modules compile. Cached Lake configurations also run the
-check when building the native target.
+The Lake build **never downloads, builds, or installs libmpdec**. A missing or
+incompatible installation stops the build with an error.
 
-Lean's bundled C sysroot may not contain the system headers needed by external
-libraries. The FFI therefore uses the host C compiler; Lake still manages final
-linking. Git is needed to fetch a `require ... from git` dependency. Python 3.12+
-is needed only for the full test suite.
-
-## Prepare libmpdec for your project
+### Prepare libmpdec
 
 Download and extract the mpdecimal source archive yourself before running these
 commands. You can transfer the archive from another machine for an offline
 installation; the commands below do not fetch it. Use a prefix without spaces
-while building the upstream library. Lake configuration and downstream
-integration tests support paths with spaces.
+while building the upstream library. Lake configuration accepts paths with spaces.
 
-### Linux
+#### Linux
 
 Install your distribution's C development tools, including a compiler and GNU
 Make. Some distributions do not provide `libmpdec-dev`; a source install works
@@ -70,7 +53,7 @@ require decimal from git "https://github.com/Qiu233/decimal" with
 Replace `/home/alice` with your actual home directory. Lean string literals do
 not expand `$HOME` or `~`. A complete `lakefile.lean` example appears below.
 
-### macOS: Apple Silicon and Intel
+#### macOS: Apple Silicon and Intel
 
 Install Apple's Command Line Tools with `xcode-select --install` if necessary.
 Use a Lean toolchain, compiler, and libmpdec built for the same architecture. On
@@ -96,7 +79,7 @@ require decimal from git "https://github.com/Qiu233/decimal" with
 
 Replace `/Users/alice` with your actual home directory.
 
-### Windows x86-64
+#### Windows x86-64
 
 Use the native Windows Lean toolchain and **MSYS2 CLANG64**, matching
 [Lean's Windows toolchain guidance](https://github.com/leanprover/lean4/blob/v4.34.0/doc/make/msys2.md).
@@ -137,9 +120,7 @@ require decimal from git "https://github.com/Qiu233/decimal" with
 ```
 
 Static linking means executables and `#eval` do not require a libmpdec DLL.
-Restart the editor after changing its inherited environment. The library's own
-dependency check runs through Lean IO; MSYS2 is used here to compile the upstream
-C dependency.
+Restart the editor after changing its inherited environment.
 
 ### Environment variables
 
@@ -175,7 +156,7 @@ Lake caches the resolved configuration. **After changing or unsetting any of
 these variables, run `lake -R build`** in your project to reload it. An ordinary
 `lake build` reuses the cached settings.
 
-### Other installation layouts and configuration precedence
+### Configuration options
 
 If headers and libraries are on the compiler's default search paths, no location
 settings are needed. Otherwise, use these keys in the dependency's `NameMap` or
@@ -197,11 +178,10 @@ prefix; explicit directory settings override those defaults.
 
 The consuming project's `-K` options do not automatically apply to its
 dependencies: use `require ... with` or environment variables for dependencies.
-When building `decimal` itself, its `-K` options also override the corresponding
-environment variables. Use absolute paths; spaces in paths are supported. Native
-link inputs propagate to your project's executables automatically.
+Use absolute paths; spaces in paths are supported. Native link inputs propagate
+to your project's executables automatically.
 
-The instructions above and release builds use **static libmpdec**. On Unix,
+The instructions above use **static libmpdec**. On Unix,
 `-fPIC` is needed for Lean's precompiled modules and `#eval`. If both static and
 shared libraries are installed, set `mpdecLinkFile` or `MPDEC_LINK_FILE` to the
 absolute path of `libmpdec.a` to ensure every link step selects the static library.
@@ -212,7 +192,7 @@ make its shared library available to the runtime loader: `LD_LIBRARY_PATH` on
 Linux, `DYLD_LIBRARY_PATH` on macOS, or `PATH` on Windows. This also applies to
 `#eval` and the editor process.
 
-## Declare and build the dependency
+### Add the dependency
 
 After preparing libmpdec, the consuming project's `lakefile.lean` can start with:
 
@@ -247,17 +227,16 @@ installation settings, run `lake -R build` to reload the configuration. If the
 header, library, or compiler is missing or incompatible, Lake reports the
 dependency error before compiling the library.
 
-The headers and static library must still be installed when using a Lake
-dependency, including with release build archives: Lake checks the installation
-and needs it when linking downstream executables or rebuilding modules. Published
-native outputs **statically link libmpdec 4.0.1**; they do not require a libmpdec
-shared library at runtime. Release archives do not install development headers or
-a standalone libmpdec library. Other supported libmpdec versions can be used by
-building from source. This package does not opt into automatic release archive
-downloads; fetching the Git dependency itself still requires repository access or
-a local mirror.
+Keep the libmpdec headers and library installed: Lake checks them when configuring
+the dependency and needs them when linking executables or rebuilding modules.
 
-## Usage
+### Examples
+
+The API supports exact construction from strings, integers, or coefficient/exponent
+pairs; formatting; addition, subtraction, multiplication, division, quantize, and
+context rounding. Signed zero, Infinity, NaN/sNaN payloads, all eight rounding
+modes, and traps are supported. Floating-point conversion, Unicode digits, sqrt,
+exp, ln, and fma are not yet implemented.
 
 ```lean
 module
@@ -304,35 +283,23 @@ precision/adjusted exponent of 999999999999999999 and a minimum stored exponent 
 -1999999999999999997. Out-of-range construction and invalid contexts signal
 InvalidOperation. Bounds are checked before converting Lean integers to C integers.
 
-## Logic and trust boundary
+## Formalized semantics
 
-- `Decimal/Model.lean` contains executable reference semantics, including rounding,
-  special-value propagation, and flags.
-- `Decimal/Basic.lean` gives each FFI operation a Lean definition. The constructor
-  and raw field are private; `toModel` explicitly materializes the representation.
-  Definitions involving private representation are not exposed downstream;
-  public `*_spec` and related theorems describe their behavior.
-- `Decimal/Proofs.lean` contains kernel-checked rounding bounds, exact rounding,
-  finite multiplication commutativity, and concrete arithmetic proofs. There are
-  no `sorry` placeholders, custom axioms, or `native_decide` proofs.
-- `native/decimal.c` uses immutable `mpd_t` external objects, GC finalizers, borrowed
-  inputs, and libmpdec's quiet API. Arithmetic operates on native coefficients
-  without converting each intermediate result to Lean integers, strings, or models.
+The public API provides Lean definitions and specification theorems for reasoning
+about decimal operations through `Decimal.Model`. Kernel-checked proofs cover
+rounding bounds, exact rounding, finite multiplication commutativity, and concrete
+arithmetic.
 
 `@[extern]` **does not prove the C implementation correct**. The theorems establish
 properties of the logical model; libmpdec, the FFI bridge, compiler, and runtime
-remain part of the execution trust boundary. Differential tests provide evidence
-of agreement, not formal verification of C. Rounded addition is not
+remain part of the execution trust boundary. Rounded addition is not
 unconditionally associative, so Decimal is not an exact rational field. `toRat?`
 provides a rational interpretation of finite values for specifications and proofs,
 not for arithmetic with very large exponents.
 
-The source uses Lean's [module system](https://lean-lang.org/doc/reference/latest/Source-Files-and-Modules/).
-Downstream Lean files should also begin with `module`. `Decimal.lean` re-exports the
-API and theorems through `public import`. Context, result, and model definitions
-use `@[expose] public section`; selected API definitions are also exposed for
-`rfl` and `simp`. Representation details and proof/test helpers stay private.
-For example, a specification theorem transfers both value and flags to the model:
+Downstream Lean files should begin with `module` and `import Decimal` to access
+the API and theorems. Use the public specification theorems to reason about
+operations. For example, this transfers both value and flags to the model:
 
 ```lean
 example (ctx : Decimal.Context) (a b : Decimal) :
@@ -340,65 +307,3 @@ example (ctx : Decimal.Context) (a b : Decimal) :
       Decimal.Model.add ctx a.toModel b.toModel := by
   simp
 ```
-
-Digit counting uses reducible integer arithmetic. `Model.digits_eq_length_repr`
-proves it equal to decimal string length. No `backward.privateInPublic` workaround
-or downstream permission to `import all` is enabled.
-
-## Development and CI
-
-Contributors can run the library's checks from a checkout of **this repository**.
-With libmpdec installed, add `-KmpdecPrefix=/absolute/path/to/mpdecimal` and
-`-KmpdecCC=clang` to these Lake commands when needed; pass `--prefix`/`--cc` to the
-integration test:
-
-```text
-lake test
-lake build decimalOracle decimalBench
-python tests/differential.py
-lake exe decimalBench 20000 100
-python tests/build_integration.py --prefix /absolute/path/to/mpdecimal
-```
-
-The differential suite compares 27,062 cases across the native implementation,
-Lean model, and Python decimal, checking results, signals, and exact
-representation. Native tests cover large integer bounds, invalid contexts, traps,
-aliasing, and concurrent access. The offline integration test creates a temporary
-Git dependency and checks public re-exports, definition unfolding, kernel proofs,
-private boundaries, `#eval`, native linking, paths with spaces, and missing-library
-errors. The benchmark times native and reference computation separately and
-checks that their final results agree.
-
-[CI](.github/workflows/lean_action_ci.yml) builds and runs all correctness tests on
-Linux x86-64, Windows x86-64, macOS Intel, and macOS ARM64. Its setup action
-explicitly downloads the pinned mpdecimal 4.0.1 source, verifies the published
-SHA-256, and builds a static library in the runner's temporary directory, with
-PIC on Unix. This network-dependent provisioning is confined to CI; Lake never
-invokes it. CI also rejects Chinese text in project files to keep the project in
-English and runs offline regression checks for the release workflow.
-
-## Publishing releases
-
-The [Release workflow](.github/workflows/release.yml) follows the structure of
-[Lean-zh/protobuf's release workflow](https://github.com/Lean-zh/protobuf/blob/master/.github/workflows/release.yml):
-
-1. Set the package version in `lakefile.lean` and commit to the default branch.
-2. Open [Release in Actions](https://github.com/Qiu233/decimal/actions/workflows/release.yml),
-   select **Run workflow** on that branch, and enter a matching tag, such as `v0.1.0`.
-3. The workflow validates the version and any existing tag, runs the complete
-   four-platform CI matrix, and packs a Lake build archive on each platform.
-4. Once all platforms pass, it creates the tag and GitHub release and uploads four
-   archives and their SHA-256 checksums. Retrying the same commit/tag updates the
-   assets; an existing tag for another commit is rejected.
-
-Pushing changes to the release workflow or its helper scripts runs only the
-offline release checks. This also registers the workflow in Actions for new
-repositories. Building and publishing release archives requires a manual run.
-
-Release archives contain this package's build outputs with libmpdec linked
-statically, plus its upstream copyright and license notice. Before packing, the
-workflow inspects native executables and shared modules to reject any dynamic
-libmpdec dependency. Archives are tied to the release's `lean-toolchain`, target
-architecture, and platform runtime; static libmpdec does not make the entire Lean
-runtime or system C library static. Only the publishing job receives repository
-write permission.
